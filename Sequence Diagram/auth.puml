@@ -1,0 +1,41 @@
+@startuml Authentication Sequence Diagram
+
+participant Client
+participant Server
+participant Router
+participant Middleware
+participant Controller
+participant User
+participant JWT
+participant Database
+
+Client -> Server: POST /api/v1/auth/login\n(email, password)
+Server -> Router: app.use('/api/v1/auth', auth)
+Router -> Middleware: protect
+Middleware -> Middleware: Extract JWT token from headers
+alt Token Exists
+    Middleware -> JWT: Verify token
+    JWT -> Database: Find User by ID\n(decoded.id)
+    Database -> User: findById(decoded.id)
+    User --> Database: User Data
+    Database --> JWT: User Data
+    JWT --> Middleware: Decoded User Data
+    Middleware -> Controller: login\n(req.body)
+    Controller -> User: findOne(email)
+    User --> Controller: User Data
+    Controller -> User: matchPassword(password)
+    User --> Controller: Match Result
+    alt Password Matches
+        Controller -> JWT: Create JWT Token
+        JWT --> Controller: JWT Token
+        Controller -> Middleware: sendTokenResponse\n(user, 200, res)
+        Middleware --> Controller: Response with Token
+        Controller -> Client: Response with Token
+    else Password Doesn't Match
+        Controller -> Client: 401 Unauthorized\nInvalid credentials
+    end
+else Token Doesn't Exist
+    Middleware -> Client: 401 Unauthorized\nNot authorized to access this route
+end
+
+@enduml
